@@ -5,5 +5,6 @@
 	<classpathentry kind="lib" path="/Users/pramote/Desktop/libs/Java/jdom-2.0.4/jdom-2.0.4.jar"/>
 	<classpathentry kind="lib" path="/Users/pramote/Desktop/libs/Java/heritrix-1.14.4/lib/commons-lang-2.3.jar"/>
 	<classpathentry kind="lib" path="/Users/pramote/Desktop/libs/Java/jsoup-1.7.2.jar"/>
+	<classpathentry kind="lib" path="/Users/pramote/Desktop/libs/Java/google-gson-2.2.2/gson-2.2.2.jar"/>
 	<classpathentry kind="output" path="bin"/>
 </classpath>
