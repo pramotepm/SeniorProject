@@ -10,6 +10,7 @@ import java.util.List;
 import java.util.concurrent.atomic.AtomicInteger;
 
 import net.mikelab.webbase.struct.Page;
+import net.mikelab.webbase.utils.ConcurrencyFileWriter;
 import net.mikelab.webbase.validate.Serializer;
 
 import com.google.gson.reflect.TypeToken;
@@ -17,10 +18,12 @@ import com.google.gson.reflect.TypeToken;
 public class GenerateIndex implements Runnable {
 	private AtomicInteger indexNumber;
 	private Path _page;
+	private ConcurrencyFileWriter cfw;
 	
-	public GenerateIndex(Path _page, AtomicInteger indexNumber) {
+	public GenerateIndex(Path _page, AtomicInteger indexNumber, ConcurrencyFileWriter cfw) {
 		this._page = _page;
 		this.indexNumber = indexNumber;
+		this.cfw = cfw;
 	}
 	
 	@SuppressWarnings("unchecked")
@@ -35,7 +38,11 @@ public class GenerateIndex implements Runnable {
 			br.close();
 			List<Page> pages = (List<Page>) Serializer.getStandardGson().fromJson(content, listType);
 			for (Page p : pages) {
-				String x = indexNumber.getAndIncrement() + " " + p.getSourceURL();
+				if (p.getSourceURL().startsWith("http")) {
+					String x = indexNumber.getAndIncrement() + " " + p.getSourceURL();
+//					System.out.println(x);
+					cfw.writeln(x);
+				}
 			}
 		} catch (IOException e) {
 			e.printStackTrace();
