@@ -10,18 +10,20 @@ import java.nio.file.Files;
 import java.nio.file.Path;
 import java.nio.file.StandardOpenOption;
 import java.util.HashMap;
+import java.util.HashSet;
 import java.util.LinkedList;
 import java.util.List;
 import java.util.Map;
+import java.util.Set;
+import java.util.concurrent.ExecutionException;
 import java.util.concurrent.ExecutorService;
 import java.util.concurrent.Executors;
-import java.util.concurrent.atomic.AtomicInteger;
+import java.util.concurrent.Future;
 
 import net.mikelab.webbase.link.HTMLTagWithAnchorParse;
 import net.mikelab.webbase.link.worker.GenerateIndex;
 import net.mikelab.webbase.struct.Page;
 import net.mikelab.webbase.struct.Vertice;
-import net.mikelab.webbase.utils.ConcurrencyFileWriter;
 
 public class ValidateMain {
 	private static Map<String, String> index = new HashMap<>();
@@ -31,6 +33,14 @@ public class ValidateMain {
 	private static String directoryOfMetaDataFile;
 	private static String directoryOfIndexFile;
 	private static String directoryOfGraphFile;
+	
+	public static String purifyURLString(String URL) {
+		String temp = URL.trim();
+		if (URL.endsWith("/"))
+			return URL.substring(0, URL.length() - 1);
+		else
+			return temp;
+	}
 	
 	private static void writeMetaData(String directoryOfLinkDownloaded, String directoryOfMetaDataFile) {
 		System.out.println("Creating meta data...");
@@ -51,18 +61,45 @@ public class ValidateMain {
 	
 	private static void createIndexFile(String directoryOfMetaDataFile, String directoryOfIndexFile) {
 		System.out.println("Creating index file...");
-		ConcurrencyFileWriter cfw = new ConcurrencyFileWriter(directoryOfIndexFile);
-		AtomicInteger indexNumber = new AtomicInteger(0);
+		int count = 0;
 		Path path = FileSystems.getDefault().getPath(directoryOfMetaDataFile);
+		List<Future<Set<String>>> futureList = new LinkedList<>(); 
 		try (DirectoryStream<Path> ds = Files.newDirectoryStream(path)) {
 			ExecutorService pool = Executors.newFixedThreadPool(8);
 			for (Path _page : ds) {
-				GenerateIndex c = new GenerateIndex(_page, indexNumber, cfw);
-				pool.execute(c);
+				count++;
+				GenerateIndex c = new GenerateIndex(_page);
+				Future<Set<String>> f = pool.submit(c);
+				futureList.add(f);
 			}
+			System.out.println("  from number of meta data: " + count + " files");
 			pool.shutdown();
 			while (!pool.isTerminated());
-			cfw.close();
+			Set<String> uniqURL = new HashSet<String>();
+			for (Future<Set<String>> f : futureList) {
+				try {
+					uniqURL.addAll(f.get());
+				} catch (InterruptedException e) {
+					e.printStackTrace();
+				} catch (ExecutionException e) {
+					e.printStackTrace();
+				}
+			}
+			int id = 0;
+			BufferedWriter indexWriter = Files.newBufferedWriter(FileSystems.getDefault().getPath(directoryOfIndexFile), StandardCharsets.UTF_8, StandardOpenOption.WRITE, StandardOpenOption.CREATE, StandardOpenOption.TRUNCATE_EXISTING);
+			for (String URL : uniqURL) {
+				indexWriter.write(id + " " + URL + "\n");
+				id++;
+			}
+			indexWriter.close();
+			for (Future<Set<String>> f : futureList) {
+				try {
+					f.get().clear();
+				} catch (InterruptedException | ExecutionException e) {
+					e.printStackTrace();
+				}
+			}
+			uniqURL.clear();
 		} catch (IOException e) {
 			e.printStackTrace();
 		}
@@ -73,9 +110,10 @@ public class ValidateMain {
 		try (BufferedReader br = Files.newBufferedReader(FileSystems.getDefault().getPath(directoryOfIndexFile), StandardCharsets.UTF_8)) {
 			String temp = null;
 			while ((temp = br.readLine()) != null) {
-				String[] _temp = temp.split(" ");
-				String ID = _temp[0];
-				String URL = _temp[1];
+//				System.out.println(temp);
+				String[] _temp = temp.split(" ", 2);
+				String ID = new String(_temp[0].getBytes(StandardCharsets.UTF_8), StandardCharsets.UTF_8);
+				String URL = new String(_temp[1].getBytes(StandardCharsets.UTF_8), StandardCharsets.UTF_8);
 				index.put(URL, ID);
 			}
 		} catch (IOException e) {
@@ -101,18 +139,28 @@ public class ValidateMain {
 				br.close();
 
 				// Parsing JSON to Page class and Mapping to numeric data
+				Set<String> usedURL = new HashSet<>(); 
 				List<Page> pages = HTMLTagWithAnchorParse.deserialize(fileContent);
 				for (Page page : pages) {
+					String purifyURL = purifyURLString(page.getSourceURL());
+					if (usedURL.contains(purifyURL) || !purifyURL.startsWith("http"))
+						continue;
+					usedURL.add(purifyURL);
 					Vertice t = new Vertice();
-					t.setURL(page.getSourceURL());
-					t.setSourceID(index.get(page.getSourceURL()));
+					t.setURL(purifyURL);
+					t.setSourceID(index.get(purifyURL));
+					if (index.get(purifyURL) == null) {
+						System.out.println(purifyURL);
+						System.out.println("cannot get index number from source URL");
+						System.exit(1);
+					}
 					for (String destURL : page.getDestinationURL()) {
 						if (index.containsKey(destURL)) {
 							t.addOutLink(index.get(destURL));
 						}
 					}
 					ts.add(t);
-					mapID2Vertice.put(index.get(page.getSourceURL()), t);
+					mapID2Vertice.put(index.get(purifyURL), t);
 				}	
 			}
 			index.clear();
@@ -159,10 +207,10 @@ public class ValidateMain {
 								directoryOfMetaDataFile = dir.toString();
 							} break;
 							case "-i": {
-								directoryOfIndexFile = dir.toString();
+								directoryOfIndexFile = dir.resolve("index.txt").toString();
 							} break;
 							case "-g": {
-								directoryOfGraphFile = dir.toString();
+								directoryOfGraphFile = dir.resolve("graph.json").toString();
 							} break;
 							default: {
 								return false;
@@ -188,15 +236,16 @@ public class ValidateMain {
 	}
 	
 	public static void main(String[] args) {
+//		args = "--begin-at-mode extract -l /Users/pramote/Desktop/WebBase/dw/link -m /Users/pramote/Desktop/WebBase/dw/meta_link -i /Users/pramote/Desktop/WebBase/dw/index -g /Users/pramote/Desktop/WebBase/dw/graph".split(" ");
 		if (args.length == 0 || checkArguments(args) == false) {
 			help();
 			System.exit(1);
 		}
 		if (mode.equals("extract")) {			
 			writeMetaData(directoryOfLinkDownloaded, directoryOfMetaDataFile);
-			createIndexFile(directoryOfMetaDataFile, directoryOfIndexFile);
-			readIndexFile(directoryOfIndexFile);
-			extractGraph(directoryOfMetaDataFile, directoryOfGraphFile);
+//			createIndexFile(directoryOfMetaDataFile, directoryOfIndexFile);
+//			readIndexFile(directoryOfIndexFile);
+//			extractGraph(directoryOfMetaDataFile, directoryOfGraphFile);
 		}
 		else if (mode.equals("index")) {
 			createIndexFile(directoryOfMetaDataFile, directoryOfIndexFile);

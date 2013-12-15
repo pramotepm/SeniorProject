@@ -9,6 +9,7 @@ import java.nio.file.Path;
 import java.nio.file.StandardOpenOption;
 
 public class ConcurrencyFileWriter {
+	private static Object lock = new Object();
 	private BufferedWriter bw = null;
 
 	public ConcurrencyFileWriter(String filepath) {
@@ -20,11 +21,14 @@ public class ConcurrencyFileWriter {
 		}
 	}
 
-	public synchronized void writeln(String text) {
-		try {
-			bw.write(text + "\n");
-		} catch (IOException e) {
-			e.printStackTrace();
+	public void writeln(String text) {
+		synchronized (lock) {
+			try {
+				System.out.println(text);
+				bw.write(text + "\n");
+			} catch (IOException e) {
+				e.printStackTrace();
+			}			
 		}
 	}
 

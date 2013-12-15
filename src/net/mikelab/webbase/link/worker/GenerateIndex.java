@@ -6,28 +6,27 @@ import java.lang.reflect.Type;
 import java.nio.charset.StandardCharsets;
 import java.nio.file.Files;
 import java.nio.file.Path;
+import java.util.HashSet;
 import java.util.List;
-import java.util.concurrent.atomic.AtomicInteger;
+import java.util.Set;
+import java.util.concurrent.Callable;
 
 import net.mikelab.webbase.struct.Page;
-import net.mikelab.webbase.utils.ConcurrencyFileWriter;
 import net.mikelab.webbase.validate.Serializer;
+import net.mikelab.webbase.validate.ValidateMain;
 
 import com.google.gson.reflect.TypeToken;
 
-public class GenerateIndex implements Runnable {
-	private AtomicInteger indexNumber;
+public class GenerateIndex implements Callable<Set<String>> {
 	private Path _page;
-	private ConcurrencyFileWriter cfw;
 	
-	public GenerateIndex(Path _page, AtomicInteger indexNumber, ConcurrencyFileWriter cfw) {
+	public GenerateIndex(Path _page) {
 		this._page = _page;
-		this.indexNumber = indexNumber;
-		this.cfw = cfw;
 	}
 	
 	@SuppressWarnings("unchecked")
-	public void run() {
+	public Set<String> call() {
+		Set<String> setOfURL = new HashSet<>();
 		Type listType = new TypeToken<List<Page>>() {}.getType();
 		String temp = null;
 		String content = "";
@@ -38,14 +37,14 @@ public class GenerateIndex implements Runnable {
 			br.close();
 			List<Page> pages = (List<Page>) Serializer.getStandardGson().fromJson(content, listType);
 			for (Page p : pages) {
-				if (p.getSourceURL().startsWith("http")) {
-					String x = indexNumber.getAndIncrement() + " " + p.getSourceURL();
-//					System.out.println(x);
-					cfw.writeln(x);
+				String URL = ValidateMain.purifyURLString(p.getSourceURL());
+				if (URL.startsWith("http")) {
+					setOfURL.add(URL);
 				}
 			}
 		} catch (IOException e) {
 			e.printStackTrace();
 		}
+		return setOfURL;
 	}
 }
