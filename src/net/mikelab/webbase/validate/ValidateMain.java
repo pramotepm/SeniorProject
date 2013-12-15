@@ -33,6 +33,7 @@ public class ValidateMain {
 	private static String directoryOfGraphFile;
 	
 	private static void writeMetaData(String directoryOfLinkDownloaded, String directoryOfMetaDataFile) {
+		System.out.println("Creating meta data...");
 		Path metaDataPath = FileSystems.getDefault().getPath(directoryOfMetaDataFile);
 		try (DirectoryStream<Path> ds = Files.newDirectoryStream(FileSystems.getDefault().getPath(directoryOfLinkDownloaded))) {
 			for (Path p : ds) {
@@ -49,6 +50,7 @@ public class ValidateMain {
 	}
 	
 	private static void createIndexFile(String directoryOfMetaDataFile, String directoryOfIndexFile) {
+		System.out.println("Creating index file...");
 		ConcurrencyFileWriter cfw = new ConcurrencyFileWriter(directoryOfIndexFile);
 		AtomicInteger indexNumber = new AtomicInteger(0);
 		Path path = FileSystems.getDefault().getPath(directoryOfMetaDataFile);
@@ -67,6 +69,7 @@ public class ValidateMain {
 	}
 	
 	private static void readIndexFile(String directoryOfIndexFile) {
+		System.out.println("Reading index file...");
 		try (BufferedReader br = Files.newBufferedReader(FileSystems.getDefault().getPath(directoryOfIndexFile), StandardCharsets.UTF_8)) {
 			String temp = null;
 			while ((temp = br.readLine()) != null) {
@@ -82,6 +85,7 @@ public class ValidateMain {
 	}
 	
 	private static void extractGraph(String directoryOfMetaDataFile, String directoryOfGraphFile) {
+		System.out.println("Creating graph...");
 		Path metaDataPath = FileSystems.getDefault().getPath(directoryOfMetaDataFile);
 		Map<String, Vertice> mapID2Vertice = new HashMap<String, Vertice>();
 		List<Vertice> ts = new LinkedList<Vertice>();
@@ -133,36 +137,43 @@ public class ValidateMain {
 			int i = 0;
 			do {
 				String option = args[i];
-				Path dir = FileSystems.getDefault().getPath(args[i+1]);
-				if (Files.isDirectory(dir)) {
-					Files.createDirectory(dir);
-				}
-				else
-					return false;
 				switch (option) {
 					case "--begin-at-mode": {
 						mode = args[i+1];
 					} break;
-					case "-l": {
-						directoryOfLinkDownloaded = dir.toString();
-					} break;
-					case "-m": {
-						directoryOfMetaDataFile = dir.toString();
-					} break;
-					case "-i": {
-						directoryOfIndexFile = dir.toString();
-					} break;
-					case "-g": {
-						directoryOfGraphFile = dir.toString();
-					} break;
 					default: {
-						return false;
+						Path dir = FileSystems.getDefault().getPath(args[i+1]);
+						if (!Files.isDirectory(dir)) {
+							try {
+								Files.createDirectory(dir);
+							} catch (IOException e) {
+								e.printStackTrace();
+								return false;
+							}
+						}
+						switch (option) {
+							case "-l": {
+								directoryOfLinkDownloaded = dir.toString();
+							} break;
+							case "-m": {
+								directoryOfMetaDataFile = dir.toString();
+							} break;
+							case "-i": {
+								directoryOfIndexFile = dir.toString();
+							} break;
+							case "-g": {
+								directoryOfGraphFile = dir.toString();
+							} break;
+							default: {
+								return false;
+							}
+						}
 					}
 				}
 				i += 2;
 			} while (i<args.length);
 			return true;
-		} catch (ArrayIndexOutOfBoundsException | IOException e) {
+		} catch (ArrayIndexOutOfBoundsException e) {
 			e.printStackTrace();
 			return false;
 		}
@@ -181,35 +192,20 @@ public class ValidateMain {
 			help();
 			System.exit(1);
 		}
-		if (mode.equals("extract")) {
-			System.out.println("Creating meta data...");
+		if (mode.equals("extract")) {			
 			writeMetaData(directoryOfLinkDownloaded, directoryOfMetaDataFile);
-			
-			System.out.println("Creating index file...");
 			createIndexFile(directoryOfMetaDataFile, directoryOfIndexFile);
-			
-			System.out.println("Reading index file...");
 			readIndexFile(directoryOfIndexFile);
-			
-			System.out.println("Creating graph...");
 			extractGraph(directoryOfMetaDataFile, directoryOfGraphFile);
 		}
 		else if (mode.equals("index")) {
-			System.out.println("Creating index file...");
 			createIndexFile(directoryOfMetaDataFile, directoryOfIndexFile);
-
-			System.out.println("Reading index file...");
 			readIndexFile(directoryOfIndexFile);
-
-			System.out.println("Creating graph...");
 			extractGraph(directoryOfMetaDataFile, directoryOfGraphFile);
 		}
 		else if (mode.equals("graph")) {
-			System.out.println("Reading index file...");
 			readIndexFile(directoryOfIndexFile);
-
-			System.out.println("Creating graph...");
-			extractGraph(directoryOfMetaDataFile, directoryOfGraphFile);			
+			extractGraph(directoryOfMetaDataFile, directoryOfGraphFile);
 		}
 	}
 }
