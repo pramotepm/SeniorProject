@@ -25,18 +25,16 @@ import net.mikelab.webbase.utils.ConcurrencyFileWriter;
 
 public class ValidateMain {
 	private static Map<String, String> index = new HashMap<>();
+	private static String mode;
 	
-	private static void writeMetaData(String directoryOfLinkDownload, String directoryOfMetaDataFile) {
+	private static String directoryOfLinkDownloaded;
+	private static String directoryOfMetaDataFile;
+	private static String directoryOfIndexFile;
+	private static String directoryOfGraphFile;
+	
+	private static void writeMetaData(String directoryOfLinkDownloaded, String directoryOfMetaDataFile) {
 		Path metaDataPath = FileSystems.getDefault().getPath(directoryOfMetaDataFile);
-		if (!Files.isDirectory(metaDataPath)) {
-			try {
-				Files.createDirectory(metaDataPath);
-			} catch (IOException e) {
-				e.printStackTrace();
-			}
-		}
-		
-		try (DirectoryStream<Path> ds = Files.newDirectoryStream(FileSystems.getDefault().getPath(directoryOfLinkDownload))) {
+		try (DirectoryStream<Path> ds = Files.newDirectoryStream(FileSystems.getDefault().getPath(directoryOfLinkDownloaded))) {
 			for (Path p : ds) {
 				String fileName = "meta-link-" + p.getFileName().toString();
 				HTMLTagWithAnchorParse parser = new HTMLTagWithAnchorParse(p.toAbsolutePath().toString());
@@ -50,10 +48,10 @@ public class ValidateMain {
 		}
 	}
 	
-	private static void createIndexFile(String pathOfMetaDataFile, String pathOfIndexFile) {
-		ConcurrencyFileWriter cfw = new ConcurrencyFileWriter(pathOfIndexFile);
+	private static void createIndexFile(String directoryOfMetaDataFile, String directoryOfIndexFile) {
+		ConcurrencyFileWriter cfw = new ConcurrencyFileWriter(directoryOfIndexFile);
 		AtomicInteger indexNumber = new AtomicInteger(0);
-		Path path = FileSystems.getDefault().getPath(pathOfMetaDataFile);
+		Path path = FileSystems.getDefault().getPath(directoryOfMetaDataFile);
 		try (DirectoryStream<Path> ds = Files.newDirectoryStream(path)) {
 			ExecutorService pool = Executors.newFixedThreadPool(8);
 			for (Path _page : ds) {
@@ -68,8 +66,8 @@ public class ValidateMain {
 		}
 	}
 	
-	private static void readIndexFile(String pathOfIndexFile) {
-		try (BufferedReader br = Files.newBufferedReader(FileSystems.getDefault().getPath(pathOfIndexFile), StandardCharsets.UTF_8)) {
+	private static void readIndexFile(String directoryOfIndexFile) {
+		try (BufferedReader br = Files.newBufferedReader(FileSystems.getDefault().getPath(directoryOfIndexFile), StandardCharsets.UTF_8)) {
 			String temp = null;
 			while ((temp = br.readLine()) != null) {
 				String[] _temp = temp.split(" ");
@@ -112,7 +110,6 @@ public class ValidateMain {
 					ts.add(t);
 					mapID2Vertice.put(index.get(page.getSourceURL()), t);
 				}	
-//				Files.write(FileSystems.getDefault().getPath(directoryOfGraphFile).resolve(fileName), Serializer.getStandardGson().toJson(incomplete_ts).getBytes(StandardCharsets.UTF_8), StandardOpenOption.CREATE, StandardOpenOption.WRITE, StandardOpenOption.TRUNCATE_EXISTING);
 			}
 			index.clear();
 			
@@ -131,10 +128,88 @@ public class ValidateMain {
 		}		
 	}
 	
+	public static boolean checkArguments(String[] args) {
+		try {
+			int i = 0;
+			do {
+				String option = args[i];
+				Path dir = FileSystems.getDefault().getPath(args[i+1]);
+				if (Files.isDirectory(dir)) {
+					Files.createDirectory(dir);
+				}
+				else
+					return false;
+				switch (option) {
+					case "--begin-at-mode": {
+						mode = args[i+1];
+					} break;
+					case "-l": {
+						directoryOfLinkDownloaded = dir.toString();
+					} break;
+					case "-m": {
+						directoryOfMetaDataFile = dir.toString();
+					} break;
+					case "-i": {
+						directoryOfIndexFile = dir.toString();
+					} break;
+					case "-g": {
+						directoryOfGraphFile = dir.toString();
+					} break;
+					default: {
+						return false;
+					}
+				}
+				i += 2;
+			} while (i<args.length);
+			return true;
+		} catch (ArrayIndexOutOfBoundsException | IOException e) {
+			e.printStackTrace();
+			return false;
+		}
+	}
+	
+	public static void help() {
+		System.out.println("  --begin-at-mode [ extract | index | graph]");
+		System.out.println("  -l <Directory for reading data from WebBase(link)>");
+		System.out.println("  -m <Directory for storing meta data>");
+		System.out.println("  -i <Directory for storing index file>");
+		System.out.println("  -g <Directory for storing graph>");
+	}
+	
 	public static void main(String[] args) {
-//		writeMetaData("/Users/pramote/Desktop/WebBase/dw/link/", "/Users/pramote/Desktop/WebBase/dw/meta_link/");
-//		createIndexFile("/Users/pramote/Desktop/WebBase/dw/meta_link/", "/Users/pramote/Desktop/WebBase/dw/index/index.txt");
-		readIndexFile("/Users/pramote/Desktop/WebBase/dw/index/index.txt");
-		extractGraph("/Users/pramote/Desktop/WebBase/dw/meta_link/", "/Users/pramote/Desktop/WebBase/dw/graph/");
+		if (args.length == 0 || checkArguments(args) == false) {
+			help();
+			System.exit(1);
+		}
+		if (mode.equals("extract")) {
+			System.out.println("Creating meta data...");
+			writeMetaData(directoryOfLinkDownloaded, directoryOfMetaDataFile);
+			
+			System.out.println("Creating index file...");
+			createIndexFile(directoryOfMetaDataFile, directoryOfIndexFile);
+			
+			System.out.println("Reading index file...");
+			readIndexFile(directoryOfIndexFile);
+			
+			System.out.println("Creating graph...");
+			extractGraph(directoryOfMetaDataFile, directoryOfGraphFile);
+		}
+		else if (mode.equals("index")) {
+			System.out.println("Creating index file...");
+			createIndexFile(directoryOfMetaDataFile, directoryOfIndexFile);
+
+			System.out.println("Reading index file...");
+			readIndexFile(directoryOfIndexFile);
+
+			System.out.println("Creating graph...");
+			extractGraph(directoryOfMetaDataFile, directoryOfGraphFile);
+		}
+		else if (mode.equals("graph")) {
+			System.out.println("Reading index file...");
+			readIndexFile(directoryOfIndexFile);
+
+			System.out.println("Creating graph...");
+			extractGraph(directoryOfMetaDataFile, directoryOfGraphFile);			
+		}
 	}
 }
