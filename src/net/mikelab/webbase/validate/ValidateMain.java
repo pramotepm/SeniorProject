@@ -3,6 +3,8 @@ package net.mikelab.webbase.validate;
 import java.io.BufferedReader;
 import java.io.BufferedWriter;
 import java.io.IOException;
+import java.io.Reader;
+import java.lang.reflect.Type;
 import java.nio.charset.StandardCharsets;
 import java.nio.file.DirectoryStream;
 import java.nio.file.FileSystems;
@@ -20,6 +22,8 @@ import java.util.concurrent.ExecutorService;
 import java.util.concurrent.Executors;
 import java.util.concurrent.Future;
 
+import com.google.gson.reflect.TypeToken;
+
 import net.mikelab.webbase.link.HTMLTagWithAnchorParse;
 import net.mikelab.webbase.link.worker.GenerateIndex;
 import net.mikelab.webbase.struct.Page;
@@ -33,15 +37,7 @@ public class ValidateMain {
 	private static String directoryOfMetaDataFile;
 	private static String directoryOfIndexFile;
 	private static String directoryOfGraphFile;
-	
-	public static String purifyURLString(String URL) {
-		String temp = URL.trim();
-		if (URL.endsWith("/"))
-			return URL.substring(0, URL.length() - 1);
-		else
-			return temp;
-	}
-	
+		
 	private static void writeMetaData(String directoryOfLinkDownloaded, String directoryOfMetaDataFile) {
 		System.out.println("Creating meta data...");
 		Path metaDataPath = FileSystems.getDefault().getPath(directoryOfMetaDataFile);
@@ -142,7 +138,7 @@ public class ValidateMain {
 				Set<String> usedURL = new HashSet<>(); 
 				List<Page> pages = HTMLTagWithAnchorParse.deserialize(fileContent);
 				for (Page page : pages) {
-					String purifyURL = purifyURLString(page.getSourceURL());
+					String purifyURL = page.getSourceURL();
 					if (usedURL.contains(purifyURL) || !purifyURL.startsWith("http"))
 						continue;
 					usedURL.add(purifyURL);
@@ -178,6 +174,25 @@ public class ValidateMain {
 		} catch (IOException e) {
 			e.printStackTrace();
 		}		
+	}
+	
+	private static void readGraph(String  directoryOfGraphFile, String directoryOfCSVFile) {
+		try(BufferedWriter bw = Files.newBufferedWriter(FileSystems.getDefault().getPath(directoryOfCSVFile), StandardCharsets.UTF_8, StandardOpenOption.WRITE, StandardOpenOption.CREATE)) {
+			Type verticeType = new TypeToken<List<Vertice>>() {}.getType();
+			List<Vertice> vs = Serializer.getStandardGson().fromJson((Reader) FileSystems.getDefault().getPath(directoryOfGraphFile), verticeType);
+			for (Vertice v : vs) {
+				StringBuilder line = new StringBuilder();
+				line.append(v.getSourceID());
+				for (String outlink : v.getOutLink()) {
+					line.append(";");
+					line.append(outlink);
+				}
+				line.append("\n");
+				bw.write(line.toString());
+			}
+		} catch (IOException e) {
+			e.printStackTrace();
+		}
 	}
 	
 	public static boolean checkArguments(String[] args) {
@@ -228,7 +243,7 @@ public class ValidateMain {
 	}
 	
 	public static void help() {
-		System.out.println("  --begin-at-mode [ extract | index | graph]");
+		System.out.println("  --begin-at-mode [ extract | index | graph | print-as-csv ]");
 		System.out.println("  -l <Directory for reading data from WebBase(link)>");
 		System.out.println("  -m <Directory for storing meta data>");
 		System.out.println("  -i <Directory for storing index file>");
@@ -243,9 +258,9 @@ public class ValidateMain {
 		}
 		if (mode.equals("extract")) {			
 			writeMetaData(directoryOfLinkDownloaded, directoryOfMetaDataFile);
-//			createIndexFile(directoryOfMetaDataFile, directoryOfIndexFile);
-//			readIndexFile(directoryOfIndexFile);
-//			extractGraph(directoryOfMetaDataFile, directoryOfGraphFile);
+			createIndexFile(directoryOfMetaDataFile, directoryOfIndexFile);
+			readIndexFile(directoryOfIndexFile);
+			extractGraph(directoryOfMetaDataFile, directoryOfGraphFile);
 		}
 		else if (mode.equals("index")) {
 			createIndexFile(directoryOfMetaDataFile, directoryOfIndexFile);
@@ -255,6 +270,9 @@ public class ValidateMain {
 		else if (mode.equals("graph")) {
 			readIndexFile(directoryOfIndexFile);
 			extractGraph(directoryOfMetaDataFile, directoryOfGraphFile);
+		}
+		else if (mode.equals("print-as-csv")) {
+			readGraph(directoryOfGraphFile, "./graph.csv");
 		}
 	}
 }

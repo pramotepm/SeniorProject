@@ -13,7 +13,6 @@ import java.util.concurrent.Callable;
 
 import net.mikelab.webbase.struct.Page;
 import net.mikelab.webbase.validate.Serializer;
-import net.mikelab.webbase.validate.ValidateMain;
 
 import com.google.gson.reflect.TypeToken;
 
@@ -37,7 +36,7 @@ public class GenerateIndex implements Callable<Set<String>> {
 			br.close();
 			List<Page> pages = (List<Page>) Serializer.getStandardGson().fromJson(content, listType);
 			for (Page p : pages) {
-				String URL = ValidateMain.purifyURLString(p.getSourceURL());
+				String URL = p.getSourceURL();
 				if (URL.startsWith("http")) {
 					setOfURL.add(URL);
 				}

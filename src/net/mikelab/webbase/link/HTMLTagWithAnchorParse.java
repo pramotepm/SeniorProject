@@ -79,7 +79,6 @@ public class HTMLTagWithAnchorParse {
 						return;
 				}
 				URL = line.replaceFirst("URL: ", "");
-				System.out.println(URL);
 				html = "";
 				while ((line = br.readLine()) != null && !line.startsWith("URL: http")) {
 					html += line;
@@ -99,10 +98,6 @@ public class HTMLTagWithAnchorParse {
 		}
 	}
 }
-
-
-
-
 
 //String line = null;
 //try (BufferedReader br = new BufferedReader(new InputStreamReader(new FileInputStream(new File(this.filePath.toAbsolutePath().toString()))))) {

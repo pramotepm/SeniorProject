@@ -12,13 +12,17 @@ public class Page {
 	private String URL;
 	private Set<String> destination;
 	
+	private String normalizeURL(String URL) {
+		return URL.trim();
+	}
+	
 	public Page(String sourceURL) {
-		this.URL = sourceURL;
+		this.URL = normalizeURL(sourceURL);
 		destination = new HashSet<>();
 	}
 	
 	public void add(String destinationURL) {
-		destination.add(destinationURL);
+		destination.add(normalizeURL(destinationURL));
 	}
 	
 	public String getSourceURL() {
