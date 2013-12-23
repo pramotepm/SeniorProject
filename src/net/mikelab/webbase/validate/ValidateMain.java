@@ -3,7 +3,6 @@ package net.mikelab.webbase.validate;
 import java.io.BufferedReader;
 import java.io.BufferedWriter;
 import java.io.IOException;
-import java.io.Reader;
 import java.lang.reflect.Type;
 import java.nio.charset.StandardCharsets;
 import java.nio.file.DirectoryStream;
@@ -123,6 +122,7 @@ public class ValidateMain {
 		Path metaDataPath = FileSystems.getDefault().getPath(directoryOfMetaDataFile);
 		Map<String, Vertice> mapID2Vertice = new HashMap<String, Vertice>();
 		List<Vertice> ts = new LinkedList<Vertice>();
+		Set<String> usedURL = new HashSet<String>();
 		try (DirectoryStream<Path> ds = Files.newDirectoryStream(metaDataPath)) {
 			// Read JSON from meta file
 			for (Path p : ds) {
@@ -134,29 +134,30 @@ public class ValidateMain {
 				}
 				br.close();
 
-				// Parsing JSON to Page class and Mapping to numeric data
-				Set<String> usedURL = new HashSet<>(); 
+				// Parsing JSON to Page class and Mapping to numeric data 
 				List<Page> pages = HTMLTagWithAnchorParse.deserialize(fileContent);
 				for (Page page : pages) {
-					String purifyURL = page.getSourceURL();
-					if (usedURL.contains(purifyURL) || !purifyURL.startsWith("http"))
-						continue;
-					usedURL.add(purifyURL);
-					Vertice t = new Vertice();
-					t.setURL(purifyURL);
-					t.setSourceID(index.get(purifyURL));
-					if (index.get(purifyURL) == null) {
-						System.out.println(purifyURL);
+					String pageURL = page.getSourceURL();
+					String pageID = index.get(pageURL);
+					if (pageID == null) {
+						System.out.println(pageURL);
 						System.out.println("cannot get index number from source URL");
 						System.exit(1);
 					}
+					if (usedURL.contains(pageID) || !pageURL.startsWith("http")) {
+						continue;
+					}
+					usedURL.add(pageID);
+					Vertice t = new Vertice();
+					t.setURL(pageURL);
+					t.setSourceID(pageID);
 					for (String destURL : page.getDestinationURL()) {
 						if (index.containsKey(destURL)) {
 							t.addOutLink(index.get(destURL));
 						}
 					}
 					ts.add(t);
-					mapID2Vertice.put(index.get(purifyURL), t);
+					mapID2Vertice.put(pageID, t);
 				}	
 			}
 			index.clear();
@@ -177,9 +178,10 @@ public class ValidateMain {
 	}
 	
 	private static void readGraph(String  directoryOfGraphFile, String directoryOfCSVFile) {
-		try(BufferedWriter bw = Files.newBufferedWriter(FileSystems.getDefault().getPath(directoryOfCSVFile), StandardCharsets.UTF_8, StandardOpenOption.WRITE, StandardOpenOption.CREATE)) {
-			Type verticeType = new TypeToken<List<Vertice>>() {}.getType();
-			List<Vertice> vs = Serializer.getStandardGson().fromJson((Reader) FileSystems.getDefault().getPath(directoryOfGraphFile), verticeType);
+		Type verticeType = new TypeToken<List<Vertice>>() {}.getType();
+		try(BufferedWriter bw = Files.newBufferedWriter(FileSystems.getDefault().getPath(directoryOfCSVFile), StandardCharsets.UTF_8, StandardOpenOption.WRITE, StandardOpenOption.CREATE, StandardOpenOption.TRUNCATE_EXISTING);
+			BufferedReader br = Files.newBufferedReader(FileSystems.getDefault().getPath(directoryOfGraphFile), StandardCharsets.UTF_8)) {
+			List<Vertice> vs = Serializer.getStandardGson().fromJson(br, verticeType);
 			for (Vertice v : vs) {
 				StringBuilder line = new StringBuilder();
 				line.append(v.getSourceID());

@@ -64,60 +64,78 @@ public class HTMLTagWithAnchorParse {
 		}
 	}
 	
-	public void extract() {
-		String URL = null;
-		String html = null;
+	private List<Integer> findDelimeterLine() {
+		List<Integer> startLine = new LinkedList<>();
+		int line_number = 1;
 		String line = null;
-		System.out.println("Reading... [ " + this.filePath.toString() + " ]");
 		try (BufferedReader br = new BufferedReader(new InputStreamReader(new FileInputStream(new File(this.filePath.toAbsolutePath().toString()))))) {
-			line = br.readLine();
-			while (line != null) {
-				URL = null;
-				while (!line.startsWith("URL: http") || line.endsWith("robots.txt")) {
-					line = br.readLine();
-					if (line == null)
-						return;
-				}
-				URL = line.replaceFirst("URL: ", "");
-				html = "";
-				while ((line = br.readLine()) != null && !line.startsWith("URL: http")) {
-					html += line;
-				}	
-				Page page = new Page(URL);
-				Document doc = Jsoup.parse(html, URL);
-				for (Element e : doc.select("a[href]")) {
-					String absURLPath = new String(e.attr("abs:href").getBytes(StandardCharsets.UTF_8), StandardCharsets.UTF_8);
-					if (absURLPath != null && absURLPath.startsWith("http")) {
-						page.add(absURLPath);
-					}
-				}
-				pages.add(page);
+			while ((line = br.readLine()) != null) {
+				if (line.trim().startsWith("URL: "))
+					startLine.add(line_number);
+				line_number++;
 			}
 		} catch (IOException e) {
 			e.printStackTrace();
 		}
+		return startLine;
 	}
+	
+	public void extract() {
+		String line = "";
+		System.out.println("Reading... [ " + this.filePath.toString() + " ]");
+		List<Integer> startAtLine = findDelimeterLine();
+		int line_number = 0;
+		int idx = 0;
+		if (startAtLine.size() != 0) {
+			try (BufferedReader br = new BufferedReader(new InputStreamReader(new FileInputStream(new File(this.filePath.toAbsolutePath().toString()))))) {
+				while (line != null) {
+					String URL = null;
+					int startLine = startAtLine.get(idx);
+					int endLine = -1;
+					if (idx + 1 < startAtLine.size()) {
+						endLine = startAtLine.get(idx + 1);
+						idx++;
+					}
+					
+					/*************** Find a source URL ***********/ 
+					while (line_number != startLine) {
+						line = br.readLine();
+						line_number++;
+					}
+					URL = line.replaceFirst("URL: ", "");
+					System.out.println(URL);
+					/**********************************************/
+					
+					/**************** Find a content *************/
+					StringBuilder html = new StringBuilder();
+					if (endLine != -1) {
+						while (line_number != (endLine-1)) {
+							html.append(br.readLine());
+							line_number++;
+						}
+					}
+					else {
+						while ((line = br.readLine()) != null) {
+							html.append(line);
+						}
+					}
+					/*********************************************/
+					
+					if (!URL.endsWith("robots.txt")) {
+						Page page = new Page(URL);
+						Document doc = Jsoup.parse(html.toString(), URL);
+						for (Element e : doc.select("a[href]")) {
+							String absURLPath = new String(e.attr("abs:href").getBytes(StandardCharsets.UTF_8), StandardCharsets.UTF_8);
+							if (absURLPath != null && absURLPath.startsWith("http")) {
+								page.add(absURLPath);
+							}
+						}
+						pages.add(page);
+					}
+				}
+			} catch (IOException e) {
+				e.printStackTrace();
+			}
+		}
+	}	
 }
-
-//String line = null;
-//try (BufferedReader br = new BufferedReader(new InputStreamReader(new FileInputStream(new File(this.filePath.toAbsolutePath().toString()))))) {
-//	while ((line = br.readLine()) != null) {
-//		if (line.startsWith("URL: http") && !line.endsWith("robots.txt")) {
-//			String URL = line.replaceFirst("URL: ", "");
-//			Page page = new Page(URL);
-//			String html = br.readLine();
-//			Document doc = Jsoup.parse(html, URL);
-//			for (Element e : doc.select("a[href]")) {
-////				String anchorText = e.text();
-////				String anchorText = new String(e.text().getBytes(StandardCharsets.UTF_8), StandardCharsets.UTF_8);
-//				String absURLPath = new String(e.attr("abs:href").getBytes(StandardCharsets.UTF_8), StandardCharsets.UTF_8);
-//				if (absURLPath != null && absURLPath.startsWith("http")) {
-//					page.add(absURLPath);
-//				}
-//			}
-//			pages.add(page);
-//		}
-//	}
-//} catch (IOException e) {
-//	e.printStackTrace();
-//}
