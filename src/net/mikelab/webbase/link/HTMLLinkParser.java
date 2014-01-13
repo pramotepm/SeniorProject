@@ -17,7 +17,7 @@ import java.util.LinkedList;
 import java.util.List;
 
 import net.mikelab.webbase.struct.Page;
-import net.mikelab.webbase.validate.Serializer;
+import net.mikelab.webbase.utils.Serializer;
 
 import org.jsoup.Jsoup;
 import org.jsoup.nodes.Document;
@@ -25,15 +25,15 @@ import org.jsoup.nodes.Element;
 
 import com.google.gson.reflect.TypeToken;
 
-public class HTMLTagWithAnchorParse {
+public class HTMLLinkParser {
 	private Path filePath = null;
 	private List<Page> pages = new LinkedList<Page>(); 
 	
-	public HTMLTagWithAnchorParse(String filePath) {
+	public HTMLLinkParser(String filePath) {
 		this.filePath = FileSystems.getDefault().getPath(filePath); 
 	}
 	
-	public HTMLTagWithAnchorParse(Path filePath) {
+	public HTMLLinkParser(Path filePath) {
 		this.filePath = filePath;
 	}
 	
@@ -103,7 +103,6 @@ public class HTMLTagWithAnchorParse {
 						line_number++;
 					}
 					URL = line.replaceFirst("URL: ", "");
-					System.out.println(URL);
 					/**********************************************/
 					
 					/**************** Find a content *************/
@@ -121,7 +120,7 @@ public class HTMLTagWithAnchorParse {
 					}
 					/*********************************************/
 					
-					if (!URL.endsWith("robots.txt")) {
+					if (!URL.endsWith("robots.txt") && URL.startsWith("http")) {
 						Page page = new Page(URL);
 						Document doc = Jsoup.parse(html.toString(), URL);
 						for (Element e : doc.select("a[href]")) {

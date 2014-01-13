@@ -1,4 +1,4 @@
-package net.mikelab.webbase.validate;
+package net.mikelab.webbase.utils;
 
 import com.google.gson.Gson;
 import com.google.gson.GsonBuilder;

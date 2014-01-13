@@ -12,7 +12,7 @@ import java.util.Set;
 import java.util.concurrent.Callable;
 
 import net.mikelab.webbase.struct.Page;
-import net.mikelab.webbase.validate.Serializer;
+import net.mikelab.webbase.utils.Serializer;
 
 import com.google.gson.reflect.TypeToken;
 

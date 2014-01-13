@@ -1,4 +1,4 @@
-package net.mikelab.webbase.validate;
+package net.mikelab.webbase.link.main;
 
 import java.io.BufferedReader;
 import java.io.BufferedWriter;
@@ -23,12 +23,13 @@ import java.util.concurrent.Future;
 
 import com.google.gson.reflect.TypeToken;
 
-import net.mikelab.webbase.link.HTMLTagWithAnchorParse;
+import net.mikelab.webbase.link.HTMLLinkParser;
 import net.mikelab.webbase.link.worker.GenerateIndex;
 import net.mikelab.webbase.struct.Page;
 import net.mikelab.webbase.struct.Vertice;
+import net.mikelab.webbase.utils.Serializer;
 
-public class ValidateMain {
+public class ExtractLinkMain {
 	private static Map<String, String> index = new HashMap<>();
 	private static String mode;
 	
@@ -43,7 +44,7 @@ public class ValidateMain {
 		try (DirectoryStream<Path> ds = Files.newDirectoryStream(FileSystems.getDefault().getPath(directoryOfLinkDownloaded))) {
 			for (Path p : ds) {
 				String fileName = "meta-link-" + p.getFileName().toString();
-				HTMLTagWithAnchorParse parser = new HTMLTagWithAnchorParse(p.toAbsolutePath().toString());
+				HTMLLinkParser parser = new HTMLLinkParser(p.toAbsolutePath().toString());
 				parser.extract();
 				System.out.print(String.format("Writing... [%s] ", fileName));
 				parser.writeToFile(metaDataPath.resolve(fileName));
@@ -105,7 +106,6 @@ public class ValidateMain {
 		try (BufferedReader br = Files.newBufferedReader(FileSystems.getDefault().getPath(directoryOfIndexFile), StandardCharsets.UTF_8)) {
 			String temp = null;
 			while ((temp = br.readLine()) != null) {
-//				System.out.println(temp);
 				String[] _temp = temp.split(" ", 2);
 				String ID = new String(_temp[0].getBytes(StandardCharsets.UTF_8), StandardCharsets.UTF_8);
 				String URL = new String(_temp[1].getBytes(StandardCharsets.UTF_8), StandardCharsets.UTF_8);
@@ -135,13 +135,13 @@ public class ValidateMain {
 				br.close();
 
 				// Parsing JSON to Page class and Mapping to numeric data 
-				List<Page> pages = HTMLTagWithAnchorParse.deserialize(fileContent);
+				List<Page> pages = HTMLLinkParser.deserialize(fileContent);
 				for (Page page : pages) {
 					String pageURL = page.getSourceURL();
 					String pageID = index.get(pageURL);
 					if (pageID == null) {
 						System.out.println(pageURL);
-						System.out.println("cannot get index number from source URL");
+						System.out.println("cannot get index number from source URL from " + p.toAbsolutePath().toString());
 						System.exit(1);
 					}
 					if (usedURL.contains(pageID) || !pageURL.startsWith("http")) {
