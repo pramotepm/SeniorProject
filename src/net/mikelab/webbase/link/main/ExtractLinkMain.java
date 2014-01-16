@@ -23,6 +23,7 @@ import java.util.concurrent.Future;
 
 import com.google.gson.reflect.TypeToken;
 
+import net.mikelab.webbase.content.HTMLContentParser;
 import net.mikelab.webbase.link.HTMLLinkParser;
 import net.mikelab.webbase.link.worker.GenerateIndex;
 import net.mikelab.webbase.struct.Page;
@@ -31,12 +32,15 @@ import net.mikelab.webbase.utils.Serializer;
 
 public class ExtractLinkMain {
 	private static Map<String, String> index = new HashMap<>();
-	private static String mode;
+	private static String mode = "";
+	private static String only_mode = "";
 	
 	private static String directoryOfLinkDownloaded;
-	private static String directoryOfMetaDataFile;
-	private static String directoryOfIndexFile;
-	private static String directoryOfGraphFile;
+	private static String PathOfMetaDataFile;
+	private static String PathOfIndexFile;
+	private static String PathOfGraphFile;
+	private static String directoryOfContentDownloaded;
+	private static String PathOfChangingHistoryFile;
 		
 	private static void writeMetaData(String directoryOfLinkDownloaded, String directoryOfMetaDataFile) {
 		System.out.println("Creating meta data...");
@@ -197,6 +201,11 @@ public class ExtractLinkMain {
 		}
 	}
 	
+	public static void createChangingHistory(String directoryOfContentDownloaded, String PathOfChangingHistoryFile) {
+		HTMLContentParser cp = new HTMLContentParser(directoryOfContentDownloaded, PathOfChangingHistoryFile);
+		cp.extract();
+	}
+	
 	public static boolean checkArguments(String[] args) {
 		try {
 			int i = 0;
@@ -205,6 +214,9 @@ public class ExtractLinkMain {
 				switch (option) {
 					case "--begin-at-mode": {
 						mode = args[i+1];
+					} break;
+					case "--only-at-mode": {
+						only_mode = args[i+1];
 					} break;
 					default: {
 						Path dir = FileSystems.getDefault().getPath(args[i+1]);
@@ -221,14 +233,20 @@ public class ExtractLinkMain {
 								directoryOfLinkDownloaded = dir.toString();
 							} break;
 							case "-m": {
-								directoryOfMetaDataFile = dir.toString();
+								PathOfMetaDataFile = dir.toString();
 							} break;
 							case "-i": {
-								directoryOfIndexFile = dir.resolve("index.txt").toString();
+								PathOfIndexFile = dir.resolve("index.txt").toString();
 							} break;
 							case "-g": {
-								directoryOfGraphFile = dir.resolve("graph.json").toString();
+								PathOfGraphFile = dir.resolve("graph.json").toString();
 							} break;
+							case "-c": {
+								directoryOfContentDownloaded = dir.toString();
+							} break;
+							case "-h": {
+								PathOfChangingHistoryFile = dir.resolve("changing_history.txt").toString();
+							}
 							default: {
 								return false;
 							}
@@ -246,10 +264,13 @@ public class ExtractLinkMain {
 	
 	public static void help() {
 		System.out.println("  --begin-at-mode [ extract | index | graph | print-as-csv ]");
+		System.out.println("  --only-at-mode [ extract-content | extract-link | indexing | graph ]");
 		System.out.println("  -l <Directory for reading data from WebBase(link)>");
 		System.out.println("  -m <Directory for storing meta data>");
 		System.out.println("  -i <Directory for storing index file>");
 		System.out.println("  -g <Directory for storing graph>");
+		System.out.println("  -c <Directory for reading data from WebBase(content)>");
+		System.out.println("  -h <Directory for storing changing history of web pages>");
 	}
 	
 	public static void main(String[] args) {
@@ -258,23 +279,39 @@ public class ExtractLinkMain {
 			help();
 			System.exit(1);
 		}
-		if (mode.equals("extract")) {			
-			writeMetaData(directoryOfLinkDownloaded, directoryOfMetaDataFile);
-			createIndexFile(directoryOfMetaDataFile, directoryOfIndexFile);
-			readIndexFile(directoryOfIndexFile);
-			extractGraph(directoryOfMetaDataFile, directoryOfGraphFile);
+		if (mode.equals("extract")) {
+			createChangingHistory(directoryOfContentDownloaded, PathOfChangingHistoryFile);
+			writeMetaData(directoryOfLinkDownloaded, PathOfMetaDataFile);
+			createIndexFile(PathOfMetaDataFile, PathOfIndexFile);
+			readIndexFile(PathOfIndexFile);
+			extractGraph(PathOfMetaDataFile, PathOfGraphFile);
 		}
 		else if (mode.equals("index")) {
-			createIndexFile(directoryOfMetaDataFile, directoryOfIndexFile);
-			readIndexFile(directoryOfIndexFile);
-			extractGraph(directoryOfMetaDataFile, directoryOfGraphFile);
+			createIndexFile(PathOfMetaDataFile, PathOfIndexFile);
+			readIndexFile(PathOfIndexFile);
+			extractGraph(PathOfMetaDataFile, PathOfGraphFile);
 		}
 		else if (mode.equals("graph")) {
-			readIndexFile(directoryOfIndexFile);
-			extractGraph(directoryOfMetaDataFile, directoryOfGraphFile);
+			readIndexFile(PathOfIndexFile);
+			extractGraph(PathOfMetaDataFile, PathOfGraphFile);
 		}
 		else if (mode.equals("print-as-csv")) {
-			readGraph(directoryOfGraphFile, "./graph.csv");
+			readGraph(PathOfGraphFile, "./graph.csv");
+		}
+		else {
+			if (only_mode.equals("extract-content")) {
+				createChangingHistory(directoryOfContentDownloaded, PathOfChangingHistoryFile);
+			}
+			else if (only_mode.equals("extract-link")) {
+				writeMetaData(directoryOfLinkDownloaded, PathOfMetaDataFile);
+			}
+			else if (only_mode.equals("indexing")) {
+				createIndexFile(PathOfMetaDataFile, PathOfIndexFile);
+			}
+			else if (only_mode.equals("graph")) {
+				readIndexFile(PathOfIndexFile);
+				extractGraph(PathOfMetaDataFile, PathOfGraphFile);
+			}
 		}
 	}
 }
